@@ -49,7 +49,7 @@ namespace ShoppingApi.Controllers
         {
             if (id != shoppingItem.Id)
             {
-                return BadRequest();
+                return BadRequest("ID mismatch");
             }
 
             _context.Entry(shoppingItem).State = EntityState.Modified;
@@ -58,8 +58,9 @@ namespace ShoppingApi.Controllers
             {
                 await _context.SaveChangesAsync();
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
+                Console.WriteLine($"Concurrency exception: {ex.Message}");
                 if (!ShoppingItemExists(id))
                 {
                     return NotFound();
@@ -69,8 +70,13 @@ namespace ShoppingApi.Controllers
                     throw;
                 }
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return StatusCode(500, "Internal server error");
+            }
 
-            return NoContent();
+            return Ok(shoppingItem);
         }
 
         // POST: api/ShoppingItems
