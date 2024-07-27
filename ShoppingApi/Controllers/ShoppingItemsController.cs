@@ -25,7 +25,7 @@ namespace ShoppingApi.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<ShoppingItem>>> GetShoppingItems()
         {
-            return await _context.ShoppingItems.ToListAsync();
+            return await _context.ShoppingItems.OrderBy(item => item.Position).ToListAsync(); // Ensure items are ordered by position
         }
 
         // GET: api/ShoppingItems/5
@@ -78,6 +78,28 @@ namespace ShoppingApi.Controllers
 
             return Ok(shoppingItem);
         }
+
+        [HttpPut("updateOrder")]
+        public async Task<IActionResult> UpdateOrder(List<ShoppingItem> items)
+        {
+            foreach (var item in items)
+            {
+                _context.Entry(item).State = EntityState.Modified;
+            }
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while updating order: {ex.Message}");
+                return StatusCode(500, "Internal server error");
+            }
+
+            return Ok();
+        }
+
 
         // POST: api/ShoppingItems
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
