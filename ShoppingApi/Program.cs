@@ -5,9 +5,8 @@ using ShoppingApi.Data;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-
 builder.Services.AddDbContext<ShoppingContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("ShoppingContext")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddControllers();
 
 // Add CORS policy
@@ -21,8 +20,6 @@ builder.Services.AddCors(options =>
                    .AllowAnyMethod();
         });
 });
-
-
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
