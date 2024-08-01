@@ -9,6 +9,9 @@ builder.Services.AddDbContext<ShoppingContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddControllers();
 
+// Register the background service
+builder.Services.AddHostedService<DatabaseKeepAliveService>();
+
 // Add CORS policy
 builder.Services.AddCors(options =>
 {
