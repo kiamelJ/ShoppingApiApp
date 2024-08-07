@@ -1,15 +1,16 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using MongoDB.Driver;
 using ShoppingApi.Models;
 
-namespace ShoppingApi.Data
+public class ShoppingContext
 {
-    public class ShoppingContext : DbContext
+    private readonly IMongoDatabase _database;
+
+    public ShoppingContext(string connectionString, string databaseName)
     {
-        public ShoppingContext(DbContextOptions<ShoppingContext> options) : base(options)
-        { 
-        }
-
-        public DbSet<ShoppingItem> ShoppingItems { get; set; }
-
+        var client = new MongoClient(connectionString);
+        _database = client.GetDatabase(databaseName);
     }
+
+    public IMongoCollection<ShoppingItem> ShoppingItems => _database.GetCollection<ShoppingItem>("ShoppingItems");
 }
+

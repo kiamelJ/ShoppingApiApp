@@ -1,16 +1,28 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using ShoppingApi.Data;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using MongoDB.Driver;
+using ShoppingApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddDbContext<ShoppingContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-builder.Services.AddControllers();
+// Configure MongoDB settings
+builder.Services.Configure<MongoDbSettings>(
+    builder.Configuration.GetSection(nameof(MongoDbSettings)));
 
-// Register the background service
-builder.Services.AddHostedService<DatabaseKeepAliveService>();
+// Register MongoDB client
+builder.Services.AddSingleton<IMongoClient, MongoClient>(sp =>
+    new MongoClient(builder.Configuration.GetValue<string>("MongoDbSettings:ConnectionString")));
+
+// Register the IMongoDatabase
+builder.Services.AddSingleton(sp =>
+    sp.GetRequiredService<IMongoClient>().GetDatabase(builder.Configuration.GetValue<string>("MongoDbSettings:DatabaseName")));
+
+// Register the ShoppingItems collection
+builder.Services.AddSingleton(sp =>
+    sp.GetRequiredService<IMongoDatabase>().GetCollection<ShoppingItem>("ShoppingItems"));
+
+builder.Services.AddControllers();
 
 // Add CORS policy
 builder.Services.AddCors(options =>
@@ -24,13 +36,11 @@ builder.Services.AddCors(options =>
         });
 });
 
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

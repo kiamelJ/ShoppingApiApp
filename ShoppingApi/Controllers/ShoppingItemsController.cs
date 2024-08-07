@@ -1,12 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ShoppingApi.Data;
+﻿using Microsoft.AspNetCore.Mvc;
+using MongoDB.Bson;
+using MongoDB.Driver;
 using ShoppingApi.Models;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace ShoppingApi.Controllers
 {
@@ -14,123 +11,83 @@ namespace ShoppingApi.Controllers
     [ApiController]
     public class ShoppingItemsController : ControllerBase
     {
-        private readonly ShoppingContext _context;
+        private readonly IMongoCollection<ShoppingItem> _shoppingItemsCollection;
 
-        public ShoppingItemsController(ShoppingContext context)
+        public ShoppingItemsController(IMongoCollection<ShoppingItem> shoppingItemsCollection)
         {
-            _context = context;
+            _shoppingItemsCollection = shoppingItemsCollection;
         }
 
-        // GET: api/ShoppingItems
         [HttpGet]
         public async Task<ActionResult<IEnumerable<ShoppingItem>>> GetShoppingItems()
         {
-            return await _context.ShoppingItems.OrderBy(item => item.Position).ToListAsync(); // Ensure items are ordered by position
+            var items = await _shoppingItemsCollection.Find(item => true).ToListAsync();
+            return Ok(items);
         }
 
-        // GET: api/ShoppingItems/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<ShoppingItem>> GetShoppingItem(int id)
+        [HttpGet("{id:length(24)}", Name = "GetShoppingItem")]
+        public async Task<ActionResult<ShoppingItem>> GetShoppingItem(string id)
         {
-            var shoppingItem = await _context.ShoppingItems.FindAsync(id);
-
-            if (shoppingItem == null)
+            var item = await _shoppingItemsCollection.Find<ShoppingItem>(item => item.Id == id).FirstOrDefaultAsync();
+            if (item == null)
             {
                 return NotFound();
             }
-
-            return shoppingItem;
+            return Ok(item);
         }
 
-        // PUT: api/ShoppingItems/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutShoppingItem(int id, ShoppingItem shoppingItem)
-        {
-            if (id != shoppingItem.Id)
-            {
-                return BadRequest("ID mismatch");
-            }
-
-            _context.Entry(shoppingItem).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException ex)
-            {
-                Console.WriteLine($"Concurrency exception: {ex.Message}");
-                if (!ShoppingItemExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"An error occurred: {ex.Message}");
-                return StatusCode(500, "Internal server error");
-            }
-
-            return Ok(shoppingItem);
-        }
-
-        [HttpPut("updateOrder")]
-        public async Task<IActionResult> UpdateOrder(List<ShoppingItem> items)
-        {
-            foreach (var item in items)
-            {
-                _context.Entry(item).State = EntityState.Modified;
-            }
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"An error occurred while updating order: {ex.Message}");
-                return StatusCode(500, "Internal server error");
-            }
-
-            return Ok();
-        }
-
-
-        // POST: api/ShoppingItems
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<ShoppingItem>> PostShoppingItem(ShoppingItem shoppingItem)
+        public async Task<ActionResult<ShoppingItem>> CreateShoppingItem([FromBody] ShoppingItemDTO itemDto)
         {
-            _context.ShoppingItems.Add(shoppingItem);
-            await _context.SaveChangesAsync();
+            if (itemDto == null)
+            {
+                return BadRequest("Item cannot be null.");
+            }
 
-            return CreatedAtAction("GetShoppingItem", new { id = shoppingItem.Id }, shoppingItem);
+            var item = new ShoppingItem
+            {
+                Name = itemDto.Name,
+                IsComplete = itemDto.IsComplete,
+                Position = itemDto.Position
+            };
+
+            await _shoppingItemsCollection.InsertOneAsync(item);
+            return CreatedAtRoute("GetShoppingItem", new { id = item.Id }, item);
         }
 
-        // DELETE: api/ShoppingItems/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteShoppingItem(int id)
+        [HttpPut("{id:length(24)}")]
+        public async Task<IActionResult> UpdateShoppingItem(string id, [FromBody] ShoppingItemDTO itemDto)
         {
-            var shoppingItem = await _context.ShoppingItems.FindAsync(id);
-            if (shoppingItem == null)
+            if (itemDto == null)
+            {
+                return BadRequest("Item cannot be null.");
+            }
+
+            var updatedItem = new ShoppingItem
+            {
+                Id = id,
+                Name = itemDto.Name,
+                IsComplete = itemDto.IsComplete,
+                Position = itemDto.Position
+            };
+
+            var result = await _shoppingItemsCollection.ReplaceOneAsync(item => item.Id == id, updatedItem);
+            if (result.MatchedCount == 0)
             {
                 return NotFound();
             }
-
-            _context.ShoppingItems.Remove(shoppingItem);
-            await _context.SaveChangesAsync();
-
             return NoContent();
         }
 
-        private bool ShoppingItemExists(int id)
+        [HttpDelete("{id:length(24)}")]
+        public async Task<IActionResult> DeleteShoppingItem(string id)
         {
-            return _context.ShoppingItems.Any(e => e.Id == id);
+            var result = await _shoppingItemsCollection.DeleteOneAsync(item => item.Id == id);
+            if (result.DeletedCount == 0)
+            {
+                return NotFound();
+            }
+            return NoContent();
         }
     }
 }
